@@ -1,10 +1,9 @@
 import pandas as pd
 import re
-from fpdf import FPDF  # ← Ajout pour l'export PDF
+from fpdf import FPDF
 
 # ================== FONCTION DE NORMALISATION DES ACCENTS ==================
 def remove_accents(text):
-    """Supprime les accents pour améliorer la correspondance"""
     if not isinstance(text, str):
         return text
     accents = {
@@ -25,9 +24,10 @@ def remove_accents(text):
         text = text.replace(acc, non_acc)
     return text
 
+
 # ================== CHARGEMENT DES FICHIERS ==================
-ins_path = 'Ins_route.csv'
-data_path = 'Data.csv'
+ins_path = './src/pixi_py/Ins_route.csv'
+data_path = './src/pixi_py/Data.csv'
 
 ins_route = pd.read_csv(ins_path, sep=',', encoding='utf-8')
 data = pd.read_csv(data_path, sep=';', encoding='utf-8', low_memory=False)
@@ -42,7 +42,7 @@ data['Identité'] = data['Identité'].astype(str).str.strip()
 data['clé_data'] = data['Identité'].str.replace(r'^71-', '', regex=True).str.strip().str.upper()
 data['clé_data_norm'] = data['clé_data'].apply(remove_accents)
 
-# Conversion numérique des colonnes
+# Conversion numérique
 cols_to_num = ['CHPT DPT route', 'ROUTE', 'CHPT DPT clm', 'CLM INDIV', 
                'CHPT DPT cyclo-cross', 'CYCLO-CROSS']
 
@@ -92,7 +92,7 @@ for idx, row in ins_route.iterrows():
     else:
         associations_ko.append((nom_complet, "NON TROUVÉ", licence, club, "N/A", "N/A", "N/A", "N/A"))
 
-# ================== EXPORT PDF ==================
+# ================== EXPORT PDF (version corrigée) ==================
 class PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 14)
@@ -109,41 +109,42 @@ class PDF(FPDF):
         self.multi_cell(0, 6, text)
         self.ln(2)
 
+
 pdf = PDF()
 pdf.add_page()
 pdf.set_auto_page_break(auto=True, margin=15)
 
-# === OK ===
+# === Coureurs OK ===
 pdf.section_title(f"Coureurs validés ({len(associations_ok)})")
 
 for nom, identite, licence, club, total, route_pts, general_pts in associations_ok:
-    ligne = f"✓ {nom} → {identite}\n" \
-            f"   Licence : {licence} | Club : {club}\n" \
-            f"   Points Route : {route_pts} | Total Général : {general_pts}"
+    ligne = f"OK  {nom} - {identite}\n" \
+            f"    Licence : {licence} | Club : {club}\n" \
+            f"    Points Route : {route_pts} | Total Général : {general_pts}"
     pdf.row(ligne)
 
-# === KO ===
+# === Coureurs KO ===
 pdf.add_page()
 pdf.section_title(f"Coureurs ne validant pas les critères ({len(associations_ko)})")
 
 for item in associations_ko:
     nom, identite, licence, club, total, route_pts, general_pts, chpt = item
-    ligne = f"✗ {nom} → {identite}\n" \
-            f"   Licence : {licence} | Club : {club}\n" \
-            f"   Points Route : {route_pts} | Total Général : {general_pts} | CHPT Route : {chpt}"
+    ligne = f"KO  {nom} - {identite}\n" \
+            f"    Licence : {licence} | Club : {club}\n" \
+            f"    Points Route : {route_pts} | Total Général : {general_pts} | CHPT Route : {chpt}"
     pdf.row(ligne)
 
 # === Récapitulatif ===
 pdf.add_page()
 pdf.section_title("Récapitulatif")
-pdf.row(f"• Coureurs répondant aux critères : {len(associations_ok)}")
-pdf.row(f"• Coureurs ne répondant pas aux critères : {len(associations_ko)}")
-pdf.row(f"• Total de coureurs traités : {len(associations_ok) + len(associations_ko)}")
+pdf.row(f"- Coureurs répondant aux critères : {len(associations_ok)}")
+pdf.row(f"- Coureurs ne répondant pas aux critères : {len(associations_ko)}")
+pdf.row(f"- Total de coureurs traités : {len(associations_ok) + len(associations_ko)}")
 
 pdf.output("Rapport_Selection_Coureurs.pdf")
-print(f"\n✅ Rapport PDF généré : Rapport_Selection_Coureurs.pdf")
+print(f"\n✅ Rapport PDF généré avec succès : Rapport_Selection_Coureurs.pdf")
 
-# ================== AFFICHAGE CONSOLE (inchangé) ==================
+# ================== AFFICHAGE CONSOLE ==================
 print(f"\nRécapitulatif :")
-print(f"• Coureurs répondant aux critères : {len(associations_ok)}")
-print(f"• Coureurs ne répondant pas aux critères : {len(associations_ko)}")
+print(f"- Coureurs répondant aux critères : {len(associations_ok)}")
+print(f"- Coureurs ne répondant pas aux critères : {len(associations_ko)}")

@@ -1,0 +1,24 @@
+[project]
+authors = [{name = "LEMAITRE Cedric", email = "c.lemaitre58@gmail.com"}]
+dependencies = []
+name = "pixi-py"
+requires-python = ">= 3.11"
+version = "0.1.0"
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-64"]
+
+[tool.pixi.pypi-dependencies]
+pixi_py = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+pandas = ">=3.0.3,<4"
+python = ">=3.14.5,<3.15"
+fpdf2 = ">=2.8.7,<3"
