@@ -2,10 +2,10 @@ import pandas as pd
 from odf.opendocument import OpenDocumentSpreadsheet
 from odf.table import Table, TableRow, TableCell
 from odf.text import P
-import os
 
 # ================== CONFIGURATION ==================
-input_csv = './src/pixi_py/DataFinales.csv'  # Change si nécessaire
+route_csv = './src/pixi_py/DataFinales.csv'          # Fichier principal Route
+clm_csv   = './src/pixi_py/CLMInd.csv'         # Fichier CLM Individuel
 
 categorie_mapping = {
     'Minime': 'Min_G',
@@ -13,20 +13,17 @@ categorie_mapping = {
     'Cadet': 'Cad_G',
     'Cadet F': 'Cad_F',
     'Junior': 'Jun_H',
-    'Junior F': 'Jun_F',           # Sera regroupé dans Fém
+    # 'Junior F': 'Jun_F',
     'Espoir': 'Esp_H',
-    # 'Espoir F': 'Esp_F',         # Sera regroupé
     'Senior': 'Sen_H',
-    # 'Senior F': ...              # Sera regroupé
     'Vétéran': 'Vet_H',
     'Super-Vétéran': 'SV_H',
     'Ancien': 'Anc_H',
     'Super-Ancien': 'Sup_Anc_H',
 }
 
-# Catégories féminines à regrouper dans un seul onglet
 femmes_categories = ['Junior F', 'Espoir F', 'Senior F', 'Vétéran F', 
-                     'Super-Vétéran F', 'Ancien F', 'Super-Ancien F', 'Minime F', 'Cadet F']
+                     'Super-Vétéran F', 'Ancien F', 'Super-Ancien F']
 
 # Mapping colonnes
 column_mapping = {
@@ -40,30 +37,15 @@ column_mapping = {
 }
 # ===================================================
 
-# Lecture du CSV
-df = pd.read_csv(input_csv, sep=';', encoding='utf-8')
-
-# Création de la colonne Noms - Prénoms
-df['Noms - Prénoms *'] = df['NOM'].astype(str).str.strip() + " " + df['Prénom'].astype(str).str.strip()
-
-# Nettoyage
-df['Catégorie Fédérale'] = df['Catégorie Fédérale'].str.strip()
-
-# === Création du document ODS ===
-doc = OpenDocumentSpreadsheet()
-
 def add_sheet(doc, sheet_name, data_df):
     table = Table(name=sheet_name)
-    
-    # En-têtes
     header_row = TableRow()
     for col in data_df.columns:
         cell = TableCell()
         cell.addElement(P(text=col))
         header_row.addElement(cell)
     table.addElement(header_row)
-    
-    # Données
+
     for _, row in data_df.iterrows():
         data_row = TableRow()
         for value in row:
@@ -74,56 +56,79 @@ def add_sheet(doc, sheet_name, data_df):
     
     doc.spreadsheet.addElement(table)
 
-# === Traitement des feuilles normales + feuille Femmes ===
-processed = set()
+# ====================== DOCUMENT ODS ======================
+doc = OpenDocumentSpreadsheet()
 
-# 1. Onglet Femmes regroupé
-femmes_df = df[df['Catégorie Fédérale'].isin(femmes_categories)].copy()
-if not femmes_df.empty:
-    output_femmes = pd.DataFrame()
-    for orig_col, new_col in column_mapping.items():
-        if orig_col in femmes_df.columns:
-            output_femmes[new_col] = femmes_df[orig_col]
-    
-    output_femmes['Noms - Prénoms *'] = femmes_df['Noms - Prénoms *']
-    
-    # Ordre des colonnes
-    cols_order = [
-        'Noms - Prénoms *', 'Date de délivrance *', 'N° licence FSGT 2026 *',
-        'Date de naissance *', 'multi licencié oui / non *', 'catégorie',
-        'titre route 2026*', 'Participations'
-    ]
-    output_femmes = output_femmes.reindex(columns=[c for c in cols_order if c in output_femmes.columns])
-    
-    add_sheet(doc, 'Fém_de_JàS-A', output_femmes)
-    processed.update(femmes_df.index)
+# ====================== ROUTE ======================
+df_route = pd.read_csv(route_csv, sep=';', encoding='utf-8')
+df_route['Noms - Prénoms *'] = df_route['NOM'].astype(str).str.strip() + " " + df_route['Prénom'].astype(str).str.strip()
+df_route['Catégorie Fédérale'] = df_route['Catégorie Fédérale'].str.strip()
 
-# 2. Onglets normaux (hommes + ceux non féminins)
+cols_order_base = ['Date de délivrance *', 'N° licence FSGT 2026 *', 'Noms - Prénoms *',
+                   'Date de naissance *', 'multi licencié oui / non *',
+                   'titre route 2026*', 'Participations']
+
+# 1. Onglet Femmes regroupé → avec colonne "catégorie"
+femmes_df = df_route[df_route['Catégorie Fédérale'].isin(femmes_categories)].copy()
+output_femmes = pd.DataFrame()
+for orig, new in column_mapping.items():
+    if orig in femmes_df.columns:
+        output_femmes[new] = femmes_df[orig]
+output_femmes['Noms - Prénoms *'] = femmes_df['Noms - Prénoms *']
+
+output_femmes = output_femmes.reindex(columns=[
+    'Date de délivrance *', 'N° licence FSGT 2026 *', 'Noms - Prénoms *',
+    'Date de naissance *', 'multi licencié oui / non *', 'catégorie',
+    'titre route 2026*', 'Participations'
+])
+add_sheet(doc, 'Fém_de_JàS-A', output_femmes)
+
+# 2. Onglets individuels → SANS colonne "catégorie"
 for cat, sheet_name in categorie_mapping.items():
-    group = df[df['Catégorie Fédérale'] == cat]
-    if group.empty:
-        continue
-    
+    group = df_route[df_route['Catégorie Fédérale'] == cat].copy()
     output_df = pd.DataFrame()
-    for orig_col, new_col in column_mapping.items():
-        if orig_col in group.columns:
-            output_df[new_col] = group[orig_col]
-    
+    for orig, new in column_mapping.items():
+        if orig in group.columns and new != 'catégorie':   # Exclut la colonne catégorie
+            output_df[new] = group[orig]
     output_df['Noms - Prénoms *'] = group['Noms - Prénoms *']
     
-    cols_order = [
-        'Noms - Prénoms *', 'Date de délivrance *', 'N° licence FSGT 2026 *',
-        'Date de naissance *', 'multi licencié oui / non *', 'catégorie',
-        'titre route 2026*', 'Participations'
-    ]
-    output_df = output_df.reindex(columns=[c for c in cols_order if c in output_df.columns])
-    
+    output_df = output_df.reindex(columns=cols_order_base)
     add_sheet(doc, sheet_name, output_df)
 
-# Sauvegarde
-output_file = 'route_ventilee.ods'
+# ====================== CLM_Ind_ ======================
+df_clm = pd.read_csv(clm_csv, sep=';', encoding='utf-8')
+df_clm = df_clm.dropna(how='all')
+
+df_clm['Catégorie Fédérale'] = df_clm['Catégorie Fédérale'].str.strip()
+df_clm['Noms - Prénoms *'] = df_clm['NOM'].astype(str).str.strip() + " " + df_clm['Prénom'].astype(str).str.strip()
+
+def get_genre(cat):
+    if pd.isna(cat):
+        return 'Homme'
+    return 'Femme' if str(cat).strip().endswith((' F', 'F')) else 'Homme'
+
+df_clm['Homme Femme'] = df_clm['Catégorie Fédérale'].apply(get_genre)
+
+output_clm = pd.DataFrame()
+for orig, new in column_mapping.items():
+    if orig in df_clm.columns:
+        output_clm[new] = df_clm[orig]
+
+output_clm['Noms - Prénoms *'] = df_clm['Noms - Prénoms *']
+output_clm['Homme Femme'] = df_clm['Homme Femme']
+
+output_clm = output_clm.reindex(columns=[
+    'Date de délivrance *', 'N° licence FSGT 2026 *', 'Noms - Prénoms *',
+    'Date de naissance *', 'multi licencié oui / non *', 'catégorie',
+    'titre route 2026*', 'Homme Femme', 'Participations'
+])
+
+add_sheet(doc, 'CLM_Ind_', output_clm)
+
+# ====================== SAUVEGARDE ======================
+output_file = 'Championnat_FSGT71_2026.ods'
 doc.save(output_file)
 
 print(f"✅ Fichier '{output_file}' créé avec succès !")
-print(f"• Onglet Femmes : Fém_de_JàS-A ({len(femmes_df)} lignes)")
-print(f"• Onglets créés : {list(categorie_mapping.values())}")
+print("• Colonne 'catégorie' présente uniquement dans : Fém_de_JàS-A et CLM_Ind_")
+print(f"• Total onglets : {len(categorie_mapping) + 2}")
