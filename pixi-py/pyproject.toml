@@ -22,3 +22,4 @@ pixi_py = { path = ".", editable = true }
 pandas = ">=3.0.3,<4"
 python = ">=3.14.5,<3.15"
 fpdf2 = ">=2.8.7,<3"
+openpyxl = ">=3.1.5,<4"
